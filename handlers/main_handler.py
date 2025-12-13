@@ -127,24 +127,16 @@ class TelegramBot:
             await message.chat.do('typing')
             
             try:
-                # Отправляем начальный ответ
-                processing_msg = await message.answer(
-                    f"🔍 <b>Анализирую запрос:</b>\n<i>{user_question}</i>"
-                )
                 
                 # Получаем ответ от анализатора
                 result = self.analyzer.generate_sql_and_answer(user_question=user_question)
                 
                 if result["success"]:
                     # Формируем финальный ответ
-                    response_text = f"""
-✅ <b>Результат:</b> {result['final_answer']}
-
-<code>SQL запрос:</code>
-{result['sql_query']}"""
+                    response_text = f"""{result['final_answer'].replace(" ", "")}"""
                     
                     # Редактируем исходное сообщение с результатом
-                    await processing_msg.edit_text(response_text)
+                    await message.answer(response_text)
                     
                     # Логируем успешный запрос
                     logger.info(f"Успешный запрос: {user_question}")

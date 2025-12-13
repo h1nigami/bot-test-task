@@ -201,6 +201,18 @@ class VideoDatabaseAnalyzer:
         Вопрос: "какой создатель загрузил больше всего видео?"
         SQL: SELECT creator_id, COUNT(*) as video_count FROM videos GROUP BY creator_id ORDER BY video_count DESC LIMIT 1;
         Ответ: creator123 (15 видео)
+
+         Вопрос: "Суммарный прирост просмотров создателя X за 28 ноября 2025 с 10:00 до 15:00"
+        SQL: SELECT COALESCE(SUM(s.delta_views_count), 0) FROM videos v JOIN snapshots s ON v.video_id = s.video_id WHERE v.creator_id = 'X' AND DATE(s.created_at) = '2025-11-28' AND TIME(s.created_at) BETWEEN '10:00:00' AND '15:00:00';
+        Ответ: 1200
+    
+        Вопрос: "На сколько просмотров выросли видео автора Y в период времени с A до B даты Z"
+        SQL: SELECT SUM(s.delta_views_count) FROM videos v INNER JOIN snapshots s ON v.video_id = s.video_id WHERE v.creator_id = 'Y' AND strftime('%Y-%m-%d', s.created_at) = 'Z' AND strftime('%H:%M', s.created_at) BETWEEN 'A' AND 'B';
+        Ответ: 850
+    
+        Вопрос: "Прирост просмотров по всем видео креатора за конкретный день и время"
+        SQL: SELECT COALESCE(SUM(delta_views_count), 0) FROM snapshots WHERE video_id IN (SELECT video_id FROM videos WHERE creator_id = 'ID_КРЕАТОРА') AND created_at >= '2025-11-28T10:00:00' AND created_at <= '2025-11-28T15:00:00';
+        Ответ: 950
         """
         
         prompt = f"""
@@ -220,7 +232,17 @@ class VideoDatabaseAnalyzer:
         4. Всегда возвращай ОДНО ЧИСЛО в результате
         5. Если запрос требует текстового ответа, преобразуй его в число или формат "число (пояснение)"
         6. Форматируй большие числа: используй 150000 вместо 150,000
+        7. Для фильтрации по дате и времени используй ИЛИ DATE() + TIME(), ИЛИ strftime()
+        8. Для временного интервала используй BETWEEN, а не несколько условий OR
+        9. Всегда заключай сложные условия в скобки: WHERE (условие1) AND (условие2 OR условие3)
+        10. Для точных временных интервалов используй: created_at >= 'YYYY-MM-DDTHH:MM:SS' AND created_at <= 'YYYY-MM-DDTHH:MM:SS'
+        11. Пример правильного интервала: TIME(created_at) BETWEEN '10:00:00' AND '15:00:00'
+        12. Пример НЕПРАВИЛЬНОГО интервала: strftime('%H', created_at) = '10' OR strftime('%H', created_at) = '11' ...
         
+        ОБРАЗЕЦ ДЛЯ ВРЕМЕННЫХ ЗАПРОСОВ:
+        Вопрос: "суммарный прирост за период с X до Y"
+        Правильный SQL: SELECT SUM(delta_views_count) FROM таблица WHERE условие_пользователя AND created_at >= 'начальная_дата' AND created_at <= 'конечная_дата'
+
         СТРУКТУРА ОТВЕТА:
         1. Сначала SQL-запрос в одну строку
         2. Затем пустая строка
