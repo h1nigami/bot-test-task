@@ -1,1 +1,1 @@
-from .LLM_manager import client, VideoDatabaseAnalyzer
+from .LLM_manager import VideoDatabaseAnalyzer

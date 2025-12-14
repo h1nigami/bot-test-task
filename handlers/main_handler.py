@@ -129,7 +129,7 @@ class TelegramBot:
             try:
                 
                 # Получаем ответ от анализатора
-                result = self.analyzer.generate_sql_and_answer(user_question=user_question)
+                result = await self.analyzer.generate_sql_and_answer(user_question=user_question)
                 
                 if result["success"]:
                     # Формируем финальный ответ
@@ -154,7 +154,7 @@ class TelegramBot:
 2. Использовать более простые формулировки
 3. Проверить примеры в /help
                     """
-                    await processing_msg.edit_text(error_text)
+                    await message.answer(error_text)
                     
             except Exception as e:
                 logger.error(f"Ошибка в обработке сообщения: {e}")

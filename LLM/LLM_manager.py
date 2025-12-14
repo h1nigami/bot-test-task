@@ -1,12 +1,15 @@
+import asyncio
 import logging
 import os
 import sqlite3
 from typing import Any, Dict
-from google import genai
 from dotenv import load_dotenv
 
 load_dotenv()
+print("HTTP_PROXY =", os.environ.get("HTTP_PROXY"))
+print("HTTPS_PROXY =", os.environ.get("HTTPS_PROXY"))
 
+from google import genai
 
 # Настройка логирования
 logging.basicConfig(
@@ -36,12 +39,11 @@ class VideoDatabaseAnalyzer:
         self.db_schema = self._get_database_schema()
         
         # Инициализация Gemini клиента
-        self.llm_client = genai.Client(
-            location=os.getenv("GEMINI_LOCATION", "us-central1"),
-        )
+        self.llm_client = client
         
         # Промпт-инженер для LLM
         self.system_prompt = self._create_system_prompt()
+        self.lock = asyncio.Lock()
     
     def _get_database_schema(self) -> Dict[str, Any]:
         """Получение полной схемы базы данных"""
@@ -253,59 +255,60 @@ class VideoDatabaseAnalyzer:
         
         return prompt
     
-    def generate_sql_and_answer(self, user_question: str) -> Dict[str, Any]:
+    async def generate_sql_and_answer(self, user_question: str) -> Dict[str, Any]:
         """
         Генерация SQL запроса и получение ответа из БД
         
         Returns:
             Словарь с SQL запросом, ответом и флагом успеха
         """
-        try:
-            # Подставляем вопрос пользователя в промпт
-            full_prompt = self.system_prompt.replace("{user_question}", user_question)
-            
-            # Отправляем запрос к Gemini
-            response = self.llm_client.models.generate_content(
-                model="gemma-3-27b-it",  # или другая модель
-                contents=full_prompt
-            )
-            
-            response_text = response.text.strip()
-            
-            # Парсим ответ: SQL и результат разделены пустой строкой
-            parts = response_text.split('\n\n')
-            
-            if len(parts) >= 2:
-                sql_query = parts[0].strip()
-                llm_answer = parts[1].strip()
+        async with self.lock:
+            try:
+                # Подставляем вопрос пользователя в промпт
+                full_prompt = self.system_prompt.replace("{user_question}", user_question)
                 
-                # Валидируем SQL запрос (базовая проверка)
-                sql_query_lower = sql_query.lower()
-                if not (sql_query_lower.startswith('select ') and 
-                        'from ' in sql_query_lower):
-                    raise ValueError("Сгенерирован не SELECT запрос")
+                # Отправляем запрос к Gemini
+                response = self.llm_client.models.generate_content(
+                    model="gemma-3-27b-it",  # или другая модель
+                    contents=full_prompt
+                )
                 
-                # Выполняем SQL запрос
-                actual_result = self._execute_sql_query(sql_query)
+                response_text = response.text.strip()
                 
+                # Парсим ответ: SQL и результат разделены пустой строкой
+                parts = response_text.split('\n\n')
+                
+                if len(parts) >= 2:
+                    sql_query = parts[0].strip()
+                    llm_answer = parts[1].strip()
+                    
+                    # Валидируем SQL запрос (базовая проверка)
+                    sql_query_lower = sql_query.lower()
+                    if not (sql_query_lower.startswith('select ') and 
+                            'from ' in sql_query_lower):
+                        raise ValueError("Сгенерирован не SELECT запрос")
+                    
+                    # Выполняем SQL запрос
+                    actual_result = self._execute_sql_query(sql_query)
+                    
+                    return {
+                        "success": True,
+                        "sql_query": sql_query,
+                        "llm_suggested_answer": llm_answer,
+                        "actual_result": actual_result,
+                        "final_answer": self._format_answer(actual_result)
+                    }
+                else:
+                    raise ValueError("Неверный формат ответа от LLM")
+                    
+            except Exception as e:
+                logger.error(f"Ошибка при обработке запроса '{user_question}': {e}")
                 return {
-                    "success": True,
-                    "sql_query": sql_query,
-                    "llm_suggested_answer": llm_answer,
-                    "actual_result": actual_result,
-                    "final_answer": self._format_answer(actual_result)
+                    "success": False,
+                    "error": str(e),
+                    "sql_query": None,
+                    "final_answer": "Не удалось обработать запрос. Попробуйте сформулировать иначе."
                 }
-            else:
-                raise ValueError("Неверный формат ответа от LLM")
-                
-        except Exception as e:
-            logger.error(f"Ошибка при обработке запроса '{user_question}': {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "sql_query": None,
-                "final_answer": "Не удалось обработать запрос. Попробуйте сформулировать иначе."
-            }
     
     def _execute_sql_query(self, sql_query: str) -> Any:
         """Безопасное выполнение SQL запроса"""
