@@ -269,7 +269,7 @@ class VideoDatabaseAnalyzer:
                 
                 # Отправляем запрос к Gemini
                 response = self.llm_client.models.generate_content(
-                    model="gemma-3-27b-it",  # или другая модель
+                    model="gemini-robotics-er-1.5-preview",  # или другая модель
                     contents=full_prompt
                 )
                 
