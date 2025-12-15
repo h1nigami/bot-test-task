@@ -120,25 +120,6 @@ class DataBaseManager:
             print(f"Ошибка при вставке снапшота {snapshot_data.get('id')}: {e}")
             return False
 
-    def insert_video_with_snapshots(self, video_data: Dict[str, Any]) -> bool:
-        """Вставка видео со всеми снапшотами"""
-        try:
-            # Вставляем видео
-            if not self.insert_video(video_data):
-                return False
-            
-            # Вставляем снапшоты
-            video_id = video_data.get('id')
-            snapshots = video_data.get('snapshots', [])
-            
-            for snapshot in snapshots:
-                self.insert_snapshot(snapshot, video_id)
-            
-            return True
-            
-        except Exception as e:
-            print(f"Ошибка при вставке видео со снапшотами {video_data.get('id')}: {e}")
-            return False
 
     def process_json_file(self, json_file_path: str, batch_size: int = 1000) -> Dict[str, int]:
         """Обработка JSON файла с видео данными"""

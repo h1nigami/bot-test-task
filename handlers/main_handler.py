@@ -5,8 +5,6 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 
-# Для Telegram бота (выберите один вариант):
-# Вариант 1: aiogram (более современный)
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import Message
