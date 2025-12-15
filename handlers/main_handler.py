@@ -1,14 +1,14 @@
 import os
-import sqlite3
+
 import logging
-from datetime import datetime
-from typing import Optional, Dict, Any
+
+
 from dotenv import load_dotenv
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from aiogram.types import Message
-from google import genai
+
 from LLM import VideoDatabaseAnalyzer
 from aiogram.client.default import DefaultBotProperties
 
